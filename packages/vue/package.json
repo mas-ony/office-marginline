@@ -1,0 +1,59 @@
+{
+  "name": "@marginline/vue",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Marginline DOCX editor as a Vue component",
+  "homepage": "https://github.com/mas-ony/office-marginline#readme",
+  "bugs": {
+    "url": "https://github.com/mas-ony/office-marginline/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mas-ony/office-marginline.git",
+    "directory": "packages/vue"
+  },
+  "license": "MIT",
+  "author": "Ony Octavianto",
+  "type": "module",
+  "sideEffects": ["*.css"],
+  "exports": {
+    ".": "./src/index.ts",
+    "./style.css": "./style.css"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js"
+      },
+      "./style.css": "./style.css"
+    }
+  },
+  "files": [
+    "dist",
+    "style.css"
+  ],
+  "scripts": {
+    "build": "vite build && vue-tsc -p tsconfig.build.json",
+    "typecheck": "vue-tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@marginline/core": "workspace:*",
+    "@lucide/vue": "1.57.0"
+  },
+  "peerDependencies": {
+    "vue": "^3.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.1",
+    "@vitejs/plugin-vue": "6.0.10",
+    "jsdom": "27.4.0",
+    "typescript": "5.9.3",
+    "vite": "7.3.6",
+    "vitest": "3.2.7",
+    "vue": "3.5.44",
+    "vue-tsc": "3.3.13"
+  }
+}

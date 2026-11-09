@@ -1,0 +1,61 @@
+{
+  "name": "@marginline/react",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Marginline DOCX editor as a React component",
+  "homepage": "https://github.com/mas-ony/office-marginline#readme",
+  "bugs": {
+    "url": "https://github.com/mas-ony/office-marginline/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mas-ony/office-marginline.git",
+    "directory": "packages/react"
+  },
+  "license": "MIT",
+  "author": "Ony Octavianto",
+  "type": "module",
+  "sideEffects": ["*.css"],
+  "exports": {
+    ".": "./src/index.ts",
+    "./style.css": "./style.css"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js"
+      },
+      "./style.css": "./style.css"
+    }
+  },
+  "files": [
+    "dist",
+    "style.css"
+  ],
+  "scripts": {
+    "build": "vite build && tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@marginline/core": "workspace:*",
+    "lucide-react": "1.57.0"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "5.2.0",
+    "jsdom": "27.4.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "typescript": "5.9.3",
+    "vite": "7.3.6",
+    "vitest": "3.2.7"
+  }
+}

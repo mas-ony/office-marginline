@@ -1,0 +1,23 @@
+/* Everything the editor needs: the metric-compatible fonts (also embedded in exported PDFs), the
+   ProseMirror base styles, the document styles and the interface. */
+@import '@fontsource/carlito/400.css';
+@import '@fontsource/carlito/400-italic.css';
+@import '@fontsource/carlito/700.css';
+@import '@fontsource/carlito/700-italic.css';
+@import '@fontsource/caladea/400.css';
+@import '@fontsource/caladea/400-italic.css';
+@import '@fontsource/caladea/700.css';
+@import '@fontsource/caladea/700-italic.css';
+@import '@fontsource/tinos/400.css';
+@import '@fontsource/tinos/400-italic.css';
+@import '@fontsource/tinos/700.css';
+@import '@fontsource/tinos/700-italic.css';
+@import '@fontsource/arimo/400.css';
+@import '@fontsource/arimo/400-italic.css';
+@import '@fontsource/arimo/700.css';
+@import '@fontsource/arimo/700-italic.css';
+@import '@fontsource/cousine/400.css';
+@import '@fontsource/cousine/700.css';
+@import 'prosemirror-view/style/prosemirror.css';
+@import './editor.css';
+@import './ui.css';

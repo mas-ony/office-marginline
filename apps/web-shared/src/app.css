@@ -1,0 +1,19 @@
+/* The editor fills the window. */
+html,
+body {
+  height: 100%;
+  margin: 0;
+  overflow: clip;
+}
+
+#root {
+  height: 100vh;
+  height: 100dvh;
+  overflow: clip;
+}
+
+body {
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+  background: #f5f6f8;
+}

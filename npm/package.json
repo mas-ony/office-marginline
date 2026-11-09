@@ -1,0 +1,22 @@
+{
+  "name": "marginline",
+  "version": "0.1.0",
+  "description": "Browser-based DOCX editor for desktop and mobile, with comments, suggestions, fillable fields and PDF export: the built app, ready to host as static files",
+  "homepage": "https://github.com/mas-ony/office-marginline#readme",
+  "bugs": {
+    "url": "https://github.com/mas-ony/office-marginline/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mas-ony/office-marginline.git",
+    "directory": "npm"
+  },
+  "license": "MIT",
+  "author": "Ony Octavianto",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "prepack": "pnpm --dir .. run build:npm"
+  }
+}

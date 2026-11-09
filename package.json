@@ -1,0 +1,38 @@
+{
+  "name": "marginline",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser-based DOCX editor for desktop and mobile, with comments, suggestions, fillable fields, PDF export and real-time sharing; React and Vue components",
+  "homepage": "https://github.com/mas-ony/office-marginline#readme",
+  "bugs": {
+    "url": "https://github.com/mas-ony/office-marginline/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mas-ony/office-marginline.git"
+  },
+  "license": "MIT",
+  "author": "Ony Octavianto",
+  "type": "module",
+  "packageManager": "pnpm@12.14.0",
+  "scripts": {
+    "dev": "pnpm --filter @marginline/web-react dev",
+    "dev:vue": "pnpm --filter @marginline/web-vue dev",
+    "build": "pnpm --filter \"./packages/*\" build && pnpm --filter \"./apps/*\" build",
+    "build:npm": "pnpm --filter @marginline/web-react build:npm",
+    "preview": "pnpm --filter @marginline/web-react preview",
+    "preview:vue": "pnpm --filter @marginline/web-vue preview",
+    "typecheck": "pnpm -r typecheck && tsc --noEmit -p tsconfig.e2e.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "fixtures": "node scripts/make-fixtures.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@types/node": "24.19.1",
+    "fflate": "0.8.3",
+    "typescript": "5.9.3",
+    "vitest": "3.2.7"
+  }
+}

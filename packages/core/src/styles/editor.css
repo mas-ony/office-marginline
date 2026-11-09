@@ -1,0 +1,941 @@
+/* Document rendering for the DOCX editor. Interface chrome lives in ui.css. */
+
+.ml-dx-root {
+  position: relative;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--ml-dx-canvas-bg, #e9ebee);
+  --ml-dx-ins: #2f6fe4;
+  --ml-dx-del: #d93025;
+  --ml-dx-ins-bg: rgba(47, 111, 228, 0.07);
+  --ml-dx-del-bg: rgba(217, 48, 37, 0.06);
+  --ml-dx-fmt: #7b4fd6;
+  --ml-dx-comment: rgba(255, 196, 0, 0.32);
+  --ml-dx-comment-active: rgba(255, 170, 0, 0.6);
+  --ml-dx-search: rgba(255, 213, 0, 0.55);
+  --ml-dx-search-current: rgba(255, 140, 0, 0.75);
+  --ml-dx-mark: #3b82f6;
+}
+
+.ml-dx-scroll {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  overflow-anchor: none;
+  -webkit-overflow-scrolling: touch;
+  outline: none;
+}
+
+.ml-dx-sizer {
+  position: relative;
+  margin: 0 auto;
+}
+
+.ml-dx-canvas {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+}
+
+.ml-dx-pages {
+  position: absolute;
+  inset: 0;
+}
+
+.ml-dx-page {
+  position: absolute;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.16), 0 6px 18px rgba(15, 23, 42, 0.08);
+}
+
+.ml-dx-page-blank::after {
+  content: 'Blank page';
+  position: absolute;
+  inset: 45% 0 auto;
+  text-align: center;
+  font: 12px system-ui, sans-serif;
+  color: #9aa1ab;
+}
+
+.ml-dx-hf {
+  position: absolute;
+  overflow: visible;
+}
+
+.ml-dx-col-rule {
+  position: absolute;
+  width: 0;
+  border-left: 0.75pt solid #000;
+}
+
+.ml-dx-hf-static {
+  opacity: 0.62;
+}
+
+/* Footnotes and endnotes: read-only copies drawn above the body layer so they can be clicked. */
+.ml-dx-notes {
+  position: absolute;
+  z-index: 2;
+}
+
+.ml-dx-note-sep {
+  position: relative;
+  height: 18px;
+}
+
+.ml-dx-note-sep::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: min(192px, 33%);
+  border-top: 0.75pt solid #000;
+}
+
+.ml-dx-note {
+  cursor: pointer;
+}
+
+.ml-dx-note:hover {
+  background: rgba(59, 130, 246, 0.07);
+}
+
+.ml-dx-note-num {
+  vertical-align: super;
+  font-size: 0.65em;
+  line-height: 0;
+}
+
+.ml-dx-web-notes {
+  position: relative;
+  margin-top: 24px;
+}
+
+.ml-dx-hf-editing .ml-dx-hf-static {
+  opacity: 1;
+}
+
+.ml-dx-hf-measure {
+  position: absolute;
+  left: 0;
+  top: 0;
+  visibility: hidden;
+  pointer-events: none;
+  contain: layout style;
+}
+
+.ml-dx-hf-proto {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
+.ml-dx-body-host {
+  position: absolute;
+  top: 0;
+  z-index: 1;
+}
+
+.ml-dx-doc {
+  outline: none;
+  box-sizing: content-box;
+  word-wrap: break-word;
+  white-space: pre-wrap;
+  white-space: break-spaces;
+  font-variant-ligatures: none;
+  color: #000;
+  caret-color: #000;
+  cursor: text;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+.ml-dx-doc ::selection {
+  background: rgba(59, 130, 246, 0.3);
+}
+
+/*
+ * Paragraphs: space before and after (--ml-dx-sb, --ml-dx-sa) is padding, since Word adds the two and
+ * does not collapse them. A side with a border or shading (--ml-dx-ob, --ml-dx-oa) takes the spacing
+ * as margin instead, so the border and the shading stay inside it as in Word.
+ */
+.ml-dx-p {
+  position: relative;
+  min-height: 1em;
+  line-height: calc(var(--ml-dx-lm, 1) * var(--ml-dx-lhf, 1.17));
+  margin: calc(var(--ml-dx-sb, 0pt) * var(--ml-dx-ob, 0)) 0 calc(var(--ml-dx-sa, 0pt) * var(--ml-dx-oa, 0));
+  padding-top: calc(var(--ml-dx-sb, 0pt) * (1 - var(--ml-dx-ob, 0)) + var(--ml-dx-bts, 0pt));
+  padding-bottom: calc(var(--ml-dx-sa, 0pt) * (1 - var(--ml-dx-oa, 0)) + var(--ml-dx-bbs, 0pt));
+}
+
+.ml-dx-ctx-top {
+  --ml-dx-sb: 0pt !important;
+}
+
+.ml-dx-ctx-bottom {
+  --ml-dx-sa: 0pt !important;
+}
+
+/* List labels */
+.ml-dx-list::before {
+  content: attr(data-label);
+  display: inline-block;
+  min-width: var(--ml-dx-hanging, 18pt);
+  text-indent: 0;
+  font-family: var(--ml-dx-lf, inherit);
+  font-size: var(--ml-dx-ls, inherit);
+  font-weight: var(--ml-dx-lw, inherit);
+  font-style: normal;
+  text-decoration: none;
+  color: var(--ml-dx-lc, inherit);
+  white-space: pre;
+  box-sizing: border-box;
+  padding-right: 2pt;
+}
+
+.ml-dx-list.ml-dx-suff-space::before {
+  min-width: 0;
+  content: attr(data-label) ' ';
+}
+
+.ml-dx-list.ml-dx-suff-nothing::before {
+  min-width: 0;
+  padding-right: 0;
+}
+
+.ml-dx-list.ml-dx-list-right::before {
+  text-align: right;
+  padding-right: 6pt;
+}
+
+.ml-dx-list.ml-dx-list-center::before {
+  text-align: center;
+}
+
+/* Inline atoms */
+.ml-dx-tab {
+  display: inline-block;
+  height: 1em;
+  vertical-align: baseline;
+  white-space: pre;
+  overflow: hidden;
+}
+
+.ml-dx-tab[data-leader='dot'] {
+  background-image: radial-gradient(circle, currentColor 0.7px, transparent 0.8px);
+  background-size: 4px 3px;
+  background-repeat: repeat-x;
+  background-position: 0 92%;
+}
+
+.ml-dx-tab[data-leader='hyphen'] {
+  border-bottom: 1px dashed currentColor;
+}
+
+.ml-dx-tab[data-leader='underscore'],
+.ml-dx-tab[data-leader='heavy'] {
+  border-bottom: 1px solid currentColor;
+}
+
+.ml-dx-tab[data-leader='middleDot'] {
+  background-image: radial-gradient(circle, currentColor 0.7px, transparent 0.8px);
+  background-size: 4px 3px;
+  background-repeat: repeat-x;
+  background-position: 0 55%;
+}
+
+.ml-dx-page-break,
+.ml-dx-column-break {
+  display: block;
+  height: 0;
+  user-select: none;
+}
+
+.ml-dx-view-web .ml-dx-page-break,
+.ml-dx-show-marks .ml-dx-page-break,
+.ml-dx-show-marks .ml-dx-column-break {
+  height: auto;
+  margin: 2pt 0;
+  border-top: 1px dashed #8a94a6;
+  font: 9px/1.6 system-ui, sans-serif;
+  color: #6b7280;
+  text-align: center;
+  text-indent: 0;
+}
+
+.ml-dx-view-web .ml-dx-page-break::after,
+.ml-dx-show-marks .ml-dx-page-break::after {
+  content: 'Page Break';
+}
+
+.ml-dx-show-marks .ml-dx-column-break::after {
+  content: 'Column Break';
+}
+
+.ml-dx-section-break {
+  height: 0;
+  overflow: hidden;
+  user-select: none;
+}
+
+.ml-dx-show-marks .ml-dx-section-break,
+.ml-dx-view-web .ml-dx-section-break {
+  height: auto;
+  border-top: 3px double #8a94a6;
+  margin: 4pt 0;
+}
+
+.ml-dx-show-marks .ml-dx-section-break::after,
+.ml-dx-view-web .ml-dx-section-break::after {
+  content: attr(data-label);
+  display: block;
+  font: 9px/1.6 system-ui, sans-serif;
+  color: #6b7280;
+  text-align: center;
+}
+
+.ml-dx-section-break.ProseMirror-selectednode {
+  outline: 2px solid var(--ml-dx-mark);
+}
+
+.ml-dx-fld,
+.ml-dx-instr,
+.ml-dx-bookmark,
+.ml-dx-bookmark-end {
+  display: none;
+}
+
+.ml-dx-show-marks .ml-dx-fld-begin::before {
+  content: '{';
+  color: #9ca3af;
+  display: inline;
+}
+
+.ml-dx-show-marks .ml-dx-fld-end::before {
+  content: '}';
+  color: #9ca3af;
+}
+
+.ml-dx-show-marks .ml-dx-fld {
+  display: inline;
+}
+
+.ml-dx-page-field {
+  user-select: none;
+}
+
+.ml-dx-footnote-ref::after {
+  content: attr(data-num);
+}
+
+.ml-dx-opaque {
+  display: inline-block;
+  max-width: 100%;
+  border: 1px dashed #9ca3af;
+  background: repeating-linear-gradient(45deg, #f8fafc, #f8fafc 6px, #f1f5f9 6px, #f1f5f9 12px);
+  color: #475569;
+  font: 10px/1.4 system-ui, sans-serif;
+  padding: 2px 4px;
+  vertical-align: bottom;
+  overflow: hidden;
+  box-sizing: border-box;
+  white-space: normal;
+  text-indent: 0;
+}
+
+.ml-dx-opaque-img {
+  padding: 0;
+  border: none;
+  background: none;
+  object-fit: contain;
+}
+
+.ml-dx-opaque-block {
+  border: 1px dashed #9ca3af;
+  padding: 6px;
+  color: #475569;
+  font: 11px system-ui, sans-serif;
+  background: #f8fafc;
+}
+
+.ml-dx-hidden {
+  display: none;
+}
+
+.ml-dx-show-marks .ml-dx-hidden {
+  display: inline;
+  text-decoration: underline dotted #6b7280;
+}
+
+/* Links */
+.ml-dx-link {
+  color: inherit;
+  text-decoration: inherit;
+  cursor: text;
+}
+
+.ml-dx-doc:not([contenteditable='true']) .ml-dx-link,
+.ml-dx-link:hover {
+  cursor: pointer;
+}
+
+/* Images */
+.ml-dx-image-wrap {
+  display: inline-block;
+  position: relative;
+  line-height: 0;
+  vertical-align: baseline;
+  max-width: 100%;
+}
+
+.ml-dx-image {
+  display: inline-block;
+  max-width: none;
+  user-select: none;
+}
+
+.ml-dx-view-web .ml-dx-image {
+  max-width: 100%;
+  height: auto !important;
+}
+
+.ml-dx-image-handle {
+  display: none;
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background: #fff;
+  border: 1.5px solid var(--ml-dx-mark);
+  border-radius: 2px;
+  box-sizing: border-box;
+  touch-action: none;
+  z-index: 3;
+}
+
+.ml-dx-image-wrap.ProseMirror-selectednode {
+  outline: 2px solid var(--ml-dx-mark);
+  outline-offset: 1px;
+}
+
+.ml-dx-image-wrap.ProseMirror-selectednode .ml-dx-image-handle {
+  display: block;
+}
+
+.ml-dx-handle-nw { left: -6px; top: -6px; cursor: nwse-resize; }
+.ml-dx-handle-ne { right: -6px; top: -6px; cursor: nesw-resize; }
+.ml-dx-handle-sw { left: -6px; bottom: -6px; cursor: nesw-resize; }
+.ml-dx-handle-se { right: -6px; bottom: -6px; cursor: nwse-resize; }
+
+@media (pointer: coarse) {
+  .ml-dx-image-handle {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+  }
+  .ml-dx-handle-nw { left: -12px; top: -12px; }
+  .ml-dx-handle-ne { right: -12px; top: -12px; }
+  .ml-dx-handle-sw { left: -12px; bottom: -12px; }
+  .ml-dx-handle-se { right: -12px; bottom: -12px; }
+}
+
+/* Tables */
+.ml-dx-table-wrap {
+  margin: 0;
+  max-width: none;
+}
+
+.ml-dx-view-web .ml-dx-table-wrap {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.ml-dx-table {
+  border-collapse: collapse;
+  border-spacing: 0;
+  margin: 0;
+}
+
+.ml-dx-table td {
+  position: relative;
+  vertical-align: top;
+  box-sizing: border-box;
+  padding: 0 5.4pt;
+  min-width: 1em;
+}
+
+.ml-dx-mode-editing .ml-dx-table td.ml-dx-cell-borderless,
+.ml-dx-mode-suggesting .ml-dx-table td.ml-dx-cell-borderless {
+  outline: 1px dashed rgba(100, 116, 139, 0.35);
+  outline-offset: -1px;
+}
+
+.ml-dx-cell-placeholder {
+  border: none !important;
+  background: transparent !important;
+  outline: none !important;
+}
+
+.ml-dx-table .selectedCell::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(59, 130, 246, 0.18);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.ml-dx-table .column-resize-handle {
+  position: absolute;
+  right: -2px;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  z-index: 20;
+  background-color: var(--ml-dx-mark);
+  pointer-events: none;
+}
+
+.ml-dx-doc.resize-cursor {
+  cursor: col-resize;
+}
+
+/* Pagination gaps (inserted by the layout engine) */
+.ml-dx-gap {
+  display: block;
+  pointer-events: none;
+  user-select: none;
+}
+
+.ml-dx-gap-inline {
+  display: block;
+}
+
+.ml-dx-gap-row,
+.ml-dx-gap-row td {
+  border: none !important;
+  background: transparent !important;
+  outline: none !important;
+  padding: 0 !important;
+}
+
+/* Revisions: dashed boxes around insertions and deletions. */
+.ml-dx-ins {
+  text-decoration: none;
+  outline: 1px dashed var(--ml-dx-ins);
+  outline-offset: -1px;
+  background-color: var(--ml-dx-ins-bg);
+}
+
+.ml-dx-del {
+  color: var(--ml-dx-del);
+  text-decoration: line-through;
+  text-decoration-color: var(--ml-dx-del);
+  outline: 1px dashed var(--ml-dx-del);
+  outline-offset: -1px;
+  background-color: var(--ml-dx-del-bg);
+}
+
+.ml-dx-final .ml-dx-ins,
+.ml-dx-final .ml-dx-del,
+.ml-dx-original .ml-dx-ins,
+.ml-dx-original .ml-dx-del {
+  outline: none;
+  background-color: transparent;
+}
+
+/* Content controls (fields) */
+.ml-dx-field {
+  background-color: rgba(36, 86, 245, 0.07);
+  box-shadow: inset 0 -1px 0 rgba(36, 86, 245, 0.45);
+  border-radius: 2px;
+}
+
+.ml-dx-field-placeholder {
+  color: #6b7280;
+}
+
+.ml-dx-field-focus,
+.ml-dx-field-focus .ml-dx-field {
+  background-color: #fde68a;
+  box-shadow: inset 0 -2px 0 #d4a106;
+}
+
+.ml-dx-mode-viewing .ml-dx-field {
+  background-color: transparent;
+  box-shadow: none;
+}
+
+.ml-dx-painting .ml-dx-doc {
+  cursor: copy;
+}
+
+.ml-dx-fmt-change {
+  text-decoration: underline dotted var(--ml-dx-fmt);
+}
+
+.ml-dx-mark-ins::after {
+  content: '';
+  position: absolute;
+  left: -10pt;
+  top: 0;
+  bottom: 0;
+  border-left: 2px solid var(--ml-dx-ins);
+}
+
+.ml-dx-mark-del::after {
+  content: '';
+  position: absolute;
+  left: -10pt;
+  top: 0;
+  bottom: 0;
+  border-left: 2px solid var(--ml-dx-del);
+}
+
+.ml-dx-final .ml-dx-del {
+  display: none;
+}
+
+.ml-dx-final .ml-dx-ins {
+  color: inherit;
+  text-decoration: inherit;
+}
+
+.ml-dx-final .ml-dx-fmt-change {
+  text-decoration: inherit;
+}
+
+.ml-dx-final .ml-dx-mark-ins::after,
+.ml-dx-final .ml-dx-mark-del::after,
+.ml-dx-original .ml-dx-mark-ins::after,
+.ml-dx-original .ml-dx-mark-del::after {
+  display: none;
+}
+
+/* Original: the text before the tracked changes. */
+.ml-dx-original .ml-dx-ins {
+  display: none;
+}
+
+.ml-dx-original .ml-dx-del {
+  color: inherit;
+  text-decoration: inherit;
+  background: none;
+  border: 0;
+}
+
+.ml-dx-original .ml-dx-fmt-change {
+  text-decoration: inherit;
+}
+
+/* Comments and search */
+.ml-dx-comment {
+  background-color: var(--ml-dx-comment);
+}
+
+.ml-dx-comment-active,
+.ml-dx-comment-active .ml-dx-comment {
+  background-color: var(--ml-dx-comment-active);
+}
+
+.ml-dx-hide-comments .ml-dx-comment,
+.ml-dx-hide-comments .ml-dx-comment-active {
+  background-color: transparent;
+}
+
+.ml-dx-search-hit {
+  background-color: var(--ml-dx-search);
+  border-radius: 2px;
+}
+
+.ml-dx-search-current {
+  background-color: var(--ml-dx-search-current);
+  box-shadow: 0 0 0 1px rgba(194, 65, 12, 0.6);
+}
+
+/* Non-printing characters */
+.ml-dx-show-marks .ml-dx-p::after {
+  content: '¶';
+  color: var(--ml-dx-mark);
+  font-family: Arial, sans-serif;
+  font-weight: normal;
+  font-style: normal;
+  text-decoration: none;
+  pointer-events: none;
+}
+
+.ml-dx-show-marks .ml-dx-tab {
+  background-image: linear-gradient(to right, transparent calc(100% - 9px), transparent 0);
+  position: relative;
+}
+
+.ml-dx-show-marks .ml-dx-tab::after {
+  content: '→';
+  position: absolute;
+  left: 50%;
+  top: 0;
+  transform: translateX(-50%);
+  color: var(--ml-dx-mark);
+  font: 0.8em/1.25 Arial, sans-serif;
+}
+
+.ml-dx-show-marks .ml-dx-br::after {
+  content: '↵';
+  color: var(--ml-dx-mark);
+}
+
+/* Header/footer editing */
+.ml-dx-hf-editing .ml-dx-body-host {
+  opacity: 0.4;
+}
+
+.ml-dx-hf-active {
+  z-index: 3;
+  outline: none;
+}
+
+.ml-dx-header.ml-dx-hf-active {
+  border-bottom: 1px dashed #3b82f6;
+}
+
+.ml-dx-footer.ml-dx-hf-active {
+  border-top: 1px dashed #3b82f6;
+}
+
+.ml-dx-hf-live {
+  min-height: 1em;
+}
+
+.ml-dx-hf-bar {
+  position: absolute;
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font: 12px/1.2 system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color: #1f2937;
+  white-space: nowrap;
+  user-select: none;
+  z-index: 4;
+}
+
+.ml-dx-header .ml-dx-hf-bar {
+  top: 100%;
+  margin-top: 4px;
+}
+
+.ml-dx-footer .ml-dx-hf-bar {
+  bottom: 100%;
+  margin-bottom: 4px;
+}
+
+.ml-dx-hf-label {
+  background: #3b82f6;
+  color: #fff;
+  border-radius: 4px;
+  padding: 3px 8px;
+}
+
+.ml-dx-hf-bar button {
+  font: inherit;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  border-radius: 4px;
+  padding: 3px 8px;
+  cursor: pointer;
+}
+
+.ml-dx-hf-bar button:hover {
+  background: #eff6ff;
+}
+
+/* Web (reflow) view: no pages, content fills the window. */
+.ml-dx-view-web .ml-dx-sizer {
+  width: auto !important;
+  height: auto !important;
+  margin: 0;
+}
+
+.ml-dx-view-web .ml-dx-canvas {
+  position: static;
+  transform: none !important;
+}
+
+.ml-dx-view-web .ml-dx-body-host {
+  position: relative;
+  left: auto !important;
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 20px 18px 40vh;
+  background: #fff;
+  min-height: 100%;
+  box-sizing: border-box;
+}
+
+.ml-dx-view-web .ml-dx-doc {
+  width: auto !important;
+  padding-top: 0 !important;
+}
+
+.ml-dx-view-web .ml-dx-pages,
+.ml-dx-view-web .ml-dx-hf-measure {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .ml-dx-view-web .ml-dx-body-host {
+    padding: 14px 14px 40vh;
+  }
+}
+
+/* Printing: only the cloned page canvas is visible. */
+.ml-dx-print-host {
+  display: none;
+}
+
+@media print {
+  body.ml-dx-printing > *:not(.ml-dx-print-host) {
+    display: none !important;
+  }
+
+  body.ml-dx-printing {
+    margin: 0;
+    background: #fff;
+  }
+
+  .ml-dx-print-host {
+    display: block;
+  }
+
+  .ml-dx-print-host .ml-dx-canvas {
+    position: relative;
+    transform: none !important;
+  }
+
+  .ml-dx-print-host .ml-dx-page {
+    box-shadow: none;
+  }
+
+  .ml-dx-print-host .ml-dx-hf-static {
+    opacity: 1;
+  }
+
+  .ml-dx-print-host .ml-dx-comment,
+  .ml-dx-print-host .ml-dx-search-hit,
+  .ml-dx-print-host .ml-dx-field,
+  .ml-dx-print-host .ml-dx-field-focus,
+  .ml-dx-print-host .ml-dx-comment-active {
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .ml-dx-print-host .ml-dx-cell-borderless {
+    outline: none !important;
+  }
+
+  .ml-dx-print-host .ml-dx-hf-measure,
+  .ml-dx-print-host .ml-dx-page-blank::after {
+    display: none;
+  }
+}
+
+/* Off-screen copy of the pages read by the PDF exporter (src/pdf). */
+.ml-dx-export-host {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: -1;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.ml-dx-export-host .ml-dx-canvas {
+  position: relative;
+  transform: none !important;
+}
+
+.ml-dx-export-host .ml-dx-hf-static {
+  opacity: 1;
+}
+
+.ml-dx-export-host .ml-dx-comment,
+.ml-dx-export-host .ml-dx-comment-active,
+.ml-dx-export-host .ml-dx-search-hit,
+.ml-dx-export-host .ml-dx-field,
+.ml-dx-export-host .ml-dx-field-focus,
+.ml-dx-export-host .ProseMirror-selectednode {
+  background: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.ml-dx-export-host .ml-dx-cell-borderless,
+.ml-dx-export-host .ml-dx-ins,
+.ml-dx-export-host .ml-dx-del {
+  outline: none !important;
+  background: transparent !important;
+}
+
+.ml-dx-export-host .ml-dx-ins {
+  color: var(--ml-dx-ins);
+  text-decoration: underline;
+}
+
+.ml-dx-export-host.ml-dx-final .ml-dx-ins,
+.ml-dx-export-host.ml-dx-original .ml-dx-del {
+  color: inherit;
+  text-decoration: inherit;
+}
+
+.ml-dx-export-host .ml-dx-hf-measure,
+.ml-dx-export-host .ml-dx-page-blank::after,
+.ml-dx-export-host .ml-dx-image-handle,
+.ml-dx-export-host .ml-dx-hf-bar {
+  display: none !important;
+}
+
+/* Labels drawn by CSS are replaced with real text for the exporter. */
+.ml-dx-export-host .ml-dx-list::before,
+.ml-dx-export-host .ml-dx-footnote-ref::after {
+  content: none !important;
+}
+
+/* Collaborators' cursors and selections */
+.ml-dx-remote-caret {
+  position: relative;
+  display: inline-block;
+  width: 0;
+  height: 1.1em;
+  margin: 0 -1px;
+  border-left: 2px solid;
+  vertical-align: text-bottom;
+  pointer-events: none;
+}
+
+.ml-dx-remote-name {
+  position: absolute;
+  /* Above pictures: floating ones are drawn at 1, those in front of the text at 2. */
+  z-index: 3;
+  left: -2px;
+  bottom: 100%;
+  padding: 1px 5px;
+  border-radius: 4px 4px 4px 0;
+  color: #fff;
+  font: 600 10px/1.3 system-ui, sans-serif;
+  white-space: nowrap;
+  user-select: none;
+  opacity: 0.92;
+}
+
+.ml-dx-export-host .ml-dx-remote-caret,
+.ml-dx-print-host .ml-dx-remote-caret {
+  display: none;
+}
+
+.ml-dx-export-host .ml-dx-remote-sel,
+.ml-dx-print-host .ml-dx-remote-sel {
+  background: transparent !important;
+}

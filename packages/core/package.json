@@ -1,0 +1,75 @@
+{
+  "name": "@marginline/core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "DOCX editor engine, page API and interface state of Marginline, shared by its React and Vue interfaces",
+  "homepage": "https://github.com/mas-ony/office-marginline#readme",
+  "bugs": {
+    "url": "https://github.com/mas-ony/office-marginline/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mas-ony/office-marginline.git",
+    "directory": "packages/core"
+  },
+  "license": "MIT",
+  "author": "Ony Octavianto",
+  "type": "module",
+  "sideEffects": [
+    "*.css"
+  ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./views": "./src/views.ts",
+    "./style.css": "./src/styles/index.css"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js"
+      },
+      "./views": {
+        "types": "./dist/views.d.ts",
+        "import": "./dist/views.js"
+      },
+      "./style.css": "./dist/styles/index.css"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "vite build && tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@fontsource/arimo": "5.3.0",
+    "@fontsource/caladea": "5.3.0",
+    "@fontsource/carlito": "5.3.0",
+    "@fontsource/cousine": "5.3.0",
+    "@fontsource/tinos": "5.3.0",
+    "fflate": "0.8.3",
+    "prosemirror-collab": "1.3.1",
+    "prosemirror-commands": "1.7.2",
+    "prosemirror-dropcursor": "1.8.4",
+    "prosemirror-gapcursor": "1.4.1",
+    "prosemirror-history": "1.5.1",
+    "prosemirror-keymap": "1.2.3",
+    "prosemirror-model": "1.25.12",
+    "prosemirror-state": "1.4.4",
+    "prosemirror-tables": "1.8.5",
+    "prosemirror-transform": "1.12.2",
+    "prosemirror-view": "1.42.6",
+    "qrcode-generator": "2.0.4"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.1",
+    "jsdom": "27.4.0",
+    "typescript": "5.9.3",
+    "vite": "7.3.6",
+    "vitest": "3.2.7"
+  }
+}
