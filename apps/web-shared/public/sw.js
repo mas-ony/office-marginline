@@ -1,7 +1,6 @@
 // Offline support: cache the app shell and same-origin assets as they are fetched.
 const CACHE = 'marginline-v1';
-// Caches this app has made (docx-studio was its earlier name); other apps on the same origin keep theirs.
-const OWN = /^(marginline|docx-studio)-v\d+$/;
+const OWN = /^marginline-v\d+$/;
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((c) => c.addAll(['./', './index.html', './manifest.webmanifest', './icon.svg'])).then(() => self.skipWaiting()));

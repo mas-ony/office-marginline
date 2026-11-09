@@ -2,6 +2,15 @@
   "name": "marginline",
   "version": "0.1.0",
   "description": "Browser-based DOCX editor for desktop and mobile, with comments, suggestions, fillable fields and PDF export: the built app, ready to host as static files",
+  "keywords": [
+    "comments",
+    "docx",
+    "docx-editor",
+    "office",
+    "pdf",
+    "track-changes",
+    "word-processor"
+  ],
   "homepage": "https://github.com/mas-ony/office-marginline#readme",
   "bugs": {
     "url": "https://github.com/mas-ony/office-marginline/issues"
