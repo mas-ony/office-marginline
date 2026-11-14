@@ -1,8 +1,17 @@
 {
   "name": "@marginline/core",
-  "version": "0.1.0",
-  "private": true,
+  "version": "0.2.0",
   "description": "DOCX editor engine, page API and interface state of Marginline, shared by its React and Vue interfaces",
+  "keywords": [
+    "comments",
+    "docx",
+    "docx-editor",
+    "office",
+    "pdf",
+    "track-changes",
+    "typescript",
+    "word-processor"
+  ],
   "homepage": "https://github.com/mas-ony/office-marginline#readme",
   "bugs": {
     "url": "https://github.com/mas-ony/office-marginline/issues"

@@ -1,6 +1,6 @@
 {
   "name": "marginline",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Browser-based DOCX editor for desktop and mobile, with comments, suggestions, fillable fields and PDF export: the built app, ready to host as static files",
   "keywords": [
     "comments",

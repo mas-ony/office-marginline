@@ -6,9 +6,9 @@ fillable fields, themes and a page API. On phones it reflows the text and has a 
 also works over a plain HTTP address on the local network. PDF export runs in the browser.
 
 This package is the built app: static files to put on a web server. It has no dependencies and
-nothing to build. The React and Vue packages, for putting the editor inside an app instead, are in
-the [repository](https://github.com/mas-ony/office-marginline) (`packages/react` and `packages/vue`) and
-are not on npm yet.
+nothing to build. The React and Vue packages, for putting the editor inside an app instead, are
+[`@marginline/react`](https://www.npmjs.com/package/@marginline/react) and
+[`@marginline/vue`](https://www.npmjs.com/package/@marginline/vue).
 
 ## Install
 
@@ -54,11 +54,11 @@ document is shared, the app sends nothing to a server.
 
 ## Sharing
 
-Editing together in real time (**Share > Start collaboration**) needs Marginline's relay on the
-same server, answering under `/collab`. The relay is a Vite plugin or Node middleware in the
-repository's `packages/relay`; it is not part of this package and not on npm yet. Served as static
-files, the app has no relay: the Share dialog says so and cannot start a session, and `?room=`
-links do not open.
+Editing together in real time (**Share > Start collaboration**) needs Marginline's relay on the same
+server, answering under `/collab`. The relay is a Vite plugin or Node middleware,
+[`@marginline/relay`](https://www.npmjs.com/package/@marginline/relay); it is not part of this
+package. Served as static files, the app has no relay: the Share dialog says so and cannot start a
+session, and `?room=` links do not open.
 
 ## Page API
 

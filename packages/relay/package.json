@@ -1,8 +1,12 @@
 {
   "name": "@marginline/relay",
-  "version": "0.1.0",
-  "private": true,
+  "version": "0.2.0",
   "description": "Real-time collaboration relay for Marginline: a Vite plugin or Node middleware",
+  "keywords": [
+    "docx",
+    "real-time-collaboration",
+    "typescript"
+  ],
   "homepage": "https://github.com/mas-ony/office-marginline#readme",
   "bugs": {
     "url": "https://github.com/mas-ony/office-marginline/issues"

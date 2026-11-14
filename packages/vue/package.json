@@ -1,8 +1,18 @@
 {
   "name": "@marginline/vue",
-  "version": "0.1.0",
-  "private": true,
+  "version": "0.2.0",
   "description": "Marginline DOCX editor as a Vue component",
+  "keywords": [
+    "comments",
+    "docx",
+    "docx-editor",
+    "office",
+    "pdf",
+    "track-changes",
+    "typescript",
+    "vue",
+    "word-processor"
+  ],
   "homepage": "https://github.com/mas-ony/office-marginline#readme",
   "bugs": {
     "url": "https://github.com/mas-ony/office-marginline/issues"
