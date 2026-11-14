@@ -7,7 +7,7 @@
  */
 import type { PageInfo } from '../editor/layout/geometry';
 import { parseFont, type SfntFont } from './sfnt';
-import { fontCovers, type FontRef, type ImageRef, type PdfOp, type PdfPage, type RGB, type StandardFont, winAnsi } from './writer';
+import { fontCovers, type FontRef, type ImageRef, type PathSeg, type PdfOp, type PdfPage, type RGB, type StandardFont, winAnsi } from './writer';
 
 // -----------------------------------------------------------------------------------------------
 // Fonts
@@ -178,6 +178,55 @@ function parseColor(css: string): { rgb: RGB; alpha: number } | null {
   return { rgb: [Number(m[1]), Number(m[2]), Number(m[3])], alpha: a };
 }
 
+/**
+ * A path of a drawing (the editor writes them with absolute M, L, C and Z only) as a PDF path,
+ * through the element's transform to the screen; colours blended over white like the rest.
+ */
+function pathOp(el: SVGPathElement, s: CSSStyleDeclaration, ctm: DOMMatrix, to: (x: number, y: number) => [number, number]): PdfOp | null {
+  const tokens = (el.getAttribute('d') ?? '').match(/[MLCZ]|-?\d*\.?\d+(?:e[-+]?\d+)?/gi) ?? [];
+  const at = (i: number): [number, number] => {
+    const p = new DOMPoint(Number(tokens[i]), Number(tokens[i + 1])).matrixTransform(ctm);
+    return to(p.x, p.y);
+  };
+  const segs: PathSeg[] = [];
+  for (let i = 0; i < tokens.length;) {
+    const c = tokens[i++].toUpperCase();
+    if (c === 'Z') segs.push(['Z']);
+    else if (c === 'M' || c === 'L') {
+      segs.push([c, ...at(i)]);
+      i += 2;
+    } else if (c === 'C') {
+      segs.push(['C', ...at(i), ...at(i + 2), ...at(i + 4)]);
+      i += 6;
+    }
+  }
+  const opacity = parseFloat(s.opacity || '1');
+  const paint = (value: string, alpha: number): RGB | undefined => {
+    const hex = /^#([0-9a-f]{6})$/i.exec(value.trim());
+    const c = hex ? { rgb: [0, 2, 4].map((k) => parseInt(hex[1].slice(k, k + 2), 16)) as RGB, alpha: 1 } : parseColor(value);
+    if (!c) return undefined;
+    const a = c.alpha * alpha;
+    return a > 0.02 ? solid({ rgb: c.rgb, alpha: a }) : undefined;
+  };
+  // Gradients are drawn in their middle colour.
+  const fill = paint(s.fill.startsWith('url(') ? el.dataset.fill ?? '' : s.fill, parseFloat(s.fillOpacity || '1') * opacity);
+  const stroke = paint(s.stroke, parseFloat(s.strokeOpacity || '1') * opacity);
+  if (!segs.length || (!fill && !stroke)) return null;
+  const scale = Math.sqrt(Math.abs(ctm.a * ctm.d - ctm.b * ctm.c)) || 1;
+  const dash = s.strokeDasharray && s.strokeDasharray !== 'none' ? s.strokeDasharray.split(/[\s,]+/).map((v) => parseFloat(v) * scale).filter((v) => v > 0) : undefined;
+  return {
+    kind: 'path',
+    segs,
+    fill,
+    evenOdd: s.fillRule === 'evenodd',
+    stroke,
+    width: (parseFloat(s.strokeWidth) || 1) * scale,
+    dash: dash?.length ? dash : undefined,
+    cap: s.strokeLinecap === 'round' || s.strokeLinecap === 'square' ? s.strokeLinecap : 'butt',
+    join: s.strokeLinejoin === 'round' || s.strokeLinejoin === 'bevel' ? s.strokeLinejoin : 'miter',
+  };
+}
+
 /** Blend a translucent colour over white (pages are white). */
 function solid(c: { rgb: RGB; alpha: number }): RGB {
   const a = Math.max(0, Math.min(1, c.alpha));
@@ -301,12 +350,24 @@ export async function collect(canvas: HTMLElement, pages: PageInfo[]): Promise<C
       const b = toBox(el.getBoundingClientRect());
       if (b) push(b.page, { kind: 'line', x1: b.x, y1: b.y + b.h / 2, x2: b.x + Math.min(192, b.w / 3), y2: b.y + b.h / 2, width: 1, color: [0, 0, 0] });
     }
+    if (el instanceof SVGPathElement && el.closest('.ml-dx-drawing-svg')) {
+      const r = el.getBoundingClientRect();
+      const page = pageAt(r.top - origin.top + r.height / 2);
+      const ctm = el.getScreenCTM();
+      if (page >= 0 && ctm) {
+        const op = pathOp(el, s, ctm, (x, y) => [x - origin.left - ranks[page].left, y - origin.top - ranks[page].top]);
+        if (op) push(page, op);
+      }
+    }
     if (el instanceof HTMLImageElement) {
-      const b = toBox(el.getBoundingClientRect());
+      // A cropped picture in a drawing is larger than its frame, which shows part of it.
+      const crop = el.dataset.crop?.split(' ').map(Number);
+      const frame = crop?.length === 4 && el.parentElement ? el.parentElement : el;
+      const b = toBox(frame.getBoundingClientRect());
       if (b && b.w > 0 && b.h > 0) {
         const op: PdfOp & { kind: 'image' } = { kind: 'image', x: b.x, y: b.y, w: b.w, h: b.h, image: { key: '', width: 1, height: 1 } };
         push(b.page, op);
-        images.push(rasterImage(el, b.w, b.h).then((img) => {
+        images.push(rasterImage(el, b.w, b.h, frame === el ? undefined : crop).then((img) => {
           if (img) op.image = img;
           else op.w = 0;
         }));
@@ -513,7 +574,7 @@ export async function collect(canvas: HTMLElement, pages: PageInfo[]): Promise<C
 let imageCounter = 0;
 
 /** Pixels of an image element at the size it is shown (2× for sharpness, capped). */
-async function rasterImage(img: HTMLImageElement, w: number, h: number): Promise<ImageRef | null> {
+async function rasterImage(img: HTMLImageElement, w: number, h: number, crop?: number[]): Promise<ImageRef | null> {
   try {
     if (!img.complete) await img.decode();
   } catch {
@@ -528,7 +589,13 @@ async function rasterImage(img: HTMLImageElement, w: number, h: number): Promise
   const ctx = c.getContext('2d');
   if (!ctx) return null;
   try {
-    ctx.drawImage(img, 0, 0, cw, ch);
+    if (crop) {
+      // Fractions cut from the left, top, right and bottom of the picture.
+      const [l, t, r, b] = crop;
+      const nw = img.naturalWidth;
+      const nh = img.naturalHeight;
+      ctx.drawImage(img, l * nw, t * nh, Math.max(1, (1 - l - r) * nw), Math.max(1, (1 - t - b) * nh), 0, 0, cw, ch);
+    } else ctx.drawImage(img, 0, 0, cw, ch);
     return pixels(ctx.getImageData(0, 0, cw, ch), `img${++imageCounter}`);
   } catch {
     return null;

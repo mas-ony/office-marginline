@@ -392,7 +392,7 @@ export class LayoutEngine {
           const e = n as HTMLElement;
           if (e.classList.contains('ml-dx-gap')) continue;
           const atom = e.classList.contains('ml-dx-tab') || e.classList.contains('ml-dx-image-wrap') || e.tagName === 'IMG' || e.tagName === 'BR'
-            || e.classList.contains('ml-dx-page-break') || e.classList.contains('ml-dx-column-break') || e.classList.contains('ml-dx-opaque')
+            || e.classList.contains('ml-dx-page-break') || e.classList.contains('ml-dx-column-break') || e.classList.contains('ml-dx-opaque') || e.classList.contains('ml-dx-drawing')
             || e.classList.contains('ml-dx-page-field') || e.classList.contains('ml-dx-footnote-ref');
           if (atom) {
             if (e.classList.contains('ml-dx-float') || e.style.position === 'absolute') continue;

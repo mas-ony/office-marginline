@@ -98,10 +98,14 @@ export class ImageView implements NodeView {
     if (anchor) {
       const pt = (emu: number) => `${(emu / 12700).toFixed(1)}pt`;
       if (anchor.wrap === 'topAndBottom') {
+        // On a line of its own and only as wide as the picture, so that its margins place it.
         this.dom.style.display = 'block';
+        this.dom.style.width = 'fit-content';
         this.dom.style.margin = `${pt(anchor.distT)} auto ${pt(anchor.distB)}`;
         if (anchor.hAlign === 'left') this.dom.style.marginLeft = '0';
-        if (anchor.hAlign === 'right') this.dom.style.marginRight = '0';
+        else if (anchor.hAlign === 'right') this.dom.style.marginRight = '0';
+        // Without an alignment it sits at its offset, measured from the paragraph's left edge.
+        else if (!anchor.hAlign && anchor.hOffset !== undefined) this.dom.style.marginLeft = `${emuToPx(anchor.hOffset)}px`;
       } else if (anchor.wrap === 'none') {
         this.dom.style.position = 'absolute';
         this.dom.style.zIndex = anchor.behindDoc ? '0' : '2';

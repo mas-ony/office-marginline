@@ -362,6 +362,106 @@
   background: #f8fafc;
 }
 
+/*
+ * Drawings (shapes, groups of shapes and pictures, drawing canvases) are shown, not edited.
+ * Their parts are placed absolutely in the drawing's box, in drawing order.
+ */
+.ml-dx-drawing {
+  display: inline-block;
+  position: relative;
+  vertical-align: baseline;
+  text-indent: 0;
+  user-select: none;
+  cursor: default;
+}
+
+.ml-dx-drawing.ProseMirror-selectednode {
+  outline: 2px solid var(--ml-dx-mark);
+  outline-offset: 1px;
+}
+
+/* Behind the text: under the body's paragraphs (the body layer is a stacking context). */
+.ml-dx-drawing.ml-dx-behind {
+  z-index: 0;
+}
+
+.ml-dx-body-host .ml-dx-drawing.ml-dx-behind {
+  z-index: -1;
+}
+
+.ml-dx-drawing-part {
+  position: absolute;
+  display: block;
+}
+
+.ml-dx-drawing-svg {
+  position: absolute;
+  left: 0;
+  top: 0;
+  overflow: visible;
+}
+
+.ml-dx-drawing-pic {
+  overflow: hidden;
+}
+
+.ml-dx-drawing-pic > img,
+.ml-dx-drawing-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: block;
+  max-width: none;
+}
+
+.ml-dx-drawing-fill {
+  width: 100%;
+  height: 100%;
+}
+
+/*
+ * Text in a shape: the document's defaults, not the formatting of the paragraph and run that
+ * hold the drawing (inherited properties and the paragraph's own custom properties reset).
+ */
+.ml-dx-drawing-text {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  font-family: var(--ml-dx-doc-font, inherit);
+  font-size: var(--ml-dx-doc-size, inherit);
+  font-weight: 400;
+  font-style: normal;
+  font-variant: normal;
+  color: #000;
+  text-align: left;
+  text-indent: 0;
+  text-decoration: none;
+  text-transform: none;
+  letter-spacing: normal;
+  word-spacing: normal;
+  line-height: normal;
+  vertical-align: baseline;
+  --ml-dx-lhf: var(--ml-dx-doc-lhf, 1.17);
+  --ml-dx-lm: 1;
+  --ml-dx-sb: 0pt;
+  --ml-dx-sa: 0pt;
+  --ml-dx-ob: 0;
+  --ml-dx-oa: 0;
+  --ml-dx-bts: 0pt;
+  --ml-dx-bbs: 0pt;
+  --ml-dx-hanging: 0pt;
+}
+
+.ml-dx-drawing-flow,
+.ml-dx-drawing-text .ml-dx-p {
+  display: block;
+}
+
+.ml-dx-drawing-text.ml-dx-nowrap .ml-dx-p {
+  white-space: pre;
+}
+
 .ml-dx-hidden {
   display: none;
 }
@@ -801,6 +901,13 @@
     display: none !important;
   }
 
+  /* A page that clips the window (overflow on html or body) would cut the printout to its first page. */
+  html:has(> body.ml-dx-printing),
+  body.ml-dx-printing {
+    height: auto !important;
+    overflow: visible !important;
+  }
+
   body.ml-dx-printing {
     margin: 0;
     background: #fff;
@@ -813,6 +920,8 @@
   .ml-dx-print-host .ml-dx-canvas {
     position: relative;
     transform: none !important;
+    /* As tall as the pages: text running on below the last page would print a blank one. */
+    overflow: clip;
   }
 
   .ml-dx-print-host .ml-dx-page {

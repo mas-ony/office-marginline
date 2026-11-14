@@ -223,3 +223,19 @@ export const HIGHLIGHT_COLORS: Record<string, string> = {
   black: '000000',
   white: 'FFFFFF',
 };
+
+/** Placement of a floating drawing (wp:anchor). Offsets and distances in EMU. */
+export interface AnchorInfo {
+  wrap: 'square' | 'tight' | 'through' | 'topAndBottom' | 'none';
+  behindDoc: boolean;
+  hRelative?: string;
+  hAlign?: string;
+  hOffset?: number;
+  vRelative?: string;
+  vAlign?: string;
+  vOffset?: number;
+  distT: number;
+  distB: number;
+  distL: number;
+  distR: number;
+}

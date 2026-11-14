@@ -26,4 +26,18 @@ describe('floating pictures', () => {
     expect(parseFloat(el.style.marginLeft)).toBe(9);
     ed.destroy();
   });
+
+  it('with top-and-bottom wrapping sit at their offset unless aligned', () => {
+    const ed = openEditor();
+    const place = { wrap: 'topAndBottom', behindDoc: false, hRelative: 'column', vRelative: 'paragraph', vOffset: 0, distT: 0, distB: 0, distL: 0, distR: 0 };
+    const offset = schema.nodes.image.create({ width: 1143000, height: 1143000, anchor: { ...place, hOffset: 457200 } });
+    const centred = schema.nodes.image.create({ width: 1143000, height: 1143000, anchor: { ...place, hAlign: 'center' } });
+    ed.view.dispatch(ed.view.state.tr.insert(1, [offset, centred]));
+    const [a, b] = Array.from(ed.view.dom.querySelectorAll<HTMLElement>('.ml-dx-image-wrap'));
+    expect(a.style.display).toBe('block');
+    expect(a.style.marginLeft).toBe('48px');
+    expect(b.style.marginLeft).toBe('auto');
+    expect(b.style.marginRight).toBe('auto');
+    ed.destroy();
+  });
 });

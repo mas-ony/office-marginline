@@ -362,6 +362,8 @@ export interface ThemeInfo {
   major?: string;
   minor?: string;
   colors: Record<string, string>;
+  /** Widths of the line styles in EMU (a:lnStyleLst), which shape styles refer to. */
+  lineWidths?: number[];
 }
 
 export function parseTheme(xml: string | undefined): ThemeInfo {
@@ -387,8 +389,10 @@ export function parseTheme(xml: string | undefined): ThemeInfo {
       const hex = attr(v, 'val') ?? attr(v, 'lastClr');
       if (hex) info.colors[name] = hex.toUpperCase();
     }
+    const lines = elementsDeep(root, 'a:lnStyleLst');
+    if (lines) info.lineWidths = elements(lines).filter((e) => e.name === 'a:ln').map((e) => Number(attr(e, 'w') ?? 0) || 0);
   } catch {
-    // A broken theme only affects fonts; ignore.
+    // A broken theme only affects fonts and the colours of drawings; ignore.
   }
   return info;
 }

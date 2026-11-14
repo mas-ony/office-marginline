@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
-import { expect, type Page } from '@playwright/test';
+import { inflateSync } from 'node:zlib';
+import { expect, type Locator, type Page } from '@playwright/test';
 import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate';
 
 type Ed = {
@@ -38,18 +39,21 @@ export async function openApp(page: Page, example?: string) {
 
 /**
  * Open the Tables & columns example with its picture at half size, floating at the left of the
- * text with Square wrapping (the editor has no wrapping options of its own).
+ * text with Square wrapping (the editor has no wrapping options of its own), or wrapped top and
+ * bottom; `position` is its distance from the column's left edge in EMU, or its alignment.
  */
-export async function openFloatingPicture(page: Page) {
+export async function openFloatingPicture(page: Page, wrap: 'square' | 'topAndBottom' = 'square', position: number | 'left' | 'center' | 'right' = 0) {
   await openApp(page);
   const parts = unzipSync(readFileSync(new URL('../../apps/web-shared/public/examples/tables-columns.docx', import.meta.url)));
   const xml = strFromU8(parts['word/document.xml']);
   const floating = xml.replace(/<wp:inline\b[^>]*>([\s\S]*?)<\/wp:inline>/, (_, inline: string) => {
     const half = inline.replace(/cx="(\d+)" cy="(\d+)"/g, (__, cx: string, cy: string) => `cx="${Math.round(+cx / 2)}" cy="${Math.round(+cy / 2)}"`);
     // The wrapping comes after the size in an anchor, the position before it.
-    const wrapped = half.replace(/<wp:extent [^>]*\/>(<wp:effectExtent [^>]*\/>)?/, '$&<wp:wrapSquare wrapText="bothSides"/>');
-    const position = '<wp:simplePos x="0" y="0"/><wp:positionH relativeFrom="column"><wp:posOffset>0</wp:posOffset></wp:positionH><wp:positionV relativeFrom="paragraph"><wp:posOffset>0</wp:posOffset></wp:positionV>';
-    return `<wp:anchor distT="0" distB="0" distL="114300" distR="114300" simplePos="0" relativeHeight="1" behindDoc="0" locked="0" layoutInCell="1" allowOverlap="1">${position}${wrapped}</wp:anchor>`;
+    const wrapping = wrap === 'square' ? '<wp:wrapSquare wrapText="bothSides"/>' : '<wp:wrapTopAndBottom/>';
+    const wrapped = half.replace(/<wp:extent [^>]*\/>(<wp:effectExtent [^>]*\/>)?/, `$&${wrapping}`);
+    const across = typeof position === 'number' ? `<wp:posOffset>${position}</wp:posOffset>` : `<wp:align>${position}</wp:align>`;
+    const placed = `<wp:simplePos x="0" y="0"/><wp:positionH relativeFrom="column">${across}</wp:positionH><wp:positionV relativeFrom="paragraph"><wp:posOffset>0</wp:posOffset></wp:positionV>`;
+    return `<wp:anchor distT="0" distB="0" distL="114300" distR="114300" simplePos="0" relativeHeight="1" behindDoc="0" locked="0" layoutInCell="1" allowOverlap="1">${placed}${wrapped}</wp:anchor>`;
   });
   if (floating === xml) throw new Error('no inline picture in the example');
   parts['word/document.xml'] = strToU8(floating);
@@ -58,6 +62,87 @@ export async function openFloatingPicture(page: Page) {
     await (window as unknown as { marginline: Api }).marginline.replaceFile(new Uint8Array(bytes), 'floating-picture.docx');
   }, Array.from(zipSync(parts)));
   await expect.poll(() => fileName(page)).toBe('floating-picture.docx');
+}
+
+/** Open a test document from packages/core/tests/fixtures. */
+export async function openFixture(page: Page, name: string) {
+  await openApp(page);
+  await loadFixture(page, name);
+}
+
+/** Load a test document from packages/core/tests/fixtures into the open editor. */
+export async function loadFixture(page: Page, name: string) {
+  const bytes = readFileSync(new URL(`../../packages/core/tests/fixtures/${name}`, import.meta.url));
+  await page.evaluate(async ([data, file]) => {
+    type Api = { replaceFile(src: Uint8Array, name?: string): Promise<unknown> };
+    await (window as unknown as { marginline: Api }).marginline.replaceFile(new Uint8Array(data), file);
+  }, [Array.from(bytes), name] as const);
+  await expect.poll(() => fileName(page)).toBe(name);
+}
+
+/**
+ * Open the drawings test document: a group of a picture, a text box and a line, a rectangle
+ * outlined by its shape style, shapes in the line and a drawing canvas.
+ */
+export function openDrawings(page: Page) {
+  return openFixture(page, 'drawings.docx');
+}
+
+/** The streams of a PDF made by the app, inflated and joined: page contents, fonts and pictures. */
+export function pdfStreams(bytes: Buffer): string {
+  const out: string[] = [];
+  for (const m of bytes.toString('latin1').matchAll(/\/Filter \/FlateDecode \/Length (\d+) >>\nstream\n/g)) {
+    const start = m.index + m[0].length;
+    out.push(inflateSync(bytes.subarray(start, start + Number(m[1]))).toString('latin1'));
+  }
+  return out.join('\n');
+}
+
+const clocks = new WeakSet<Page>();
+
+/**
+ * Print with Ctrl+P and count the pages Chrome makes. The editor lays out its print pages, calls
+ * window.print a moment later and removes the pages a second after that: the page's clock is
+ * held while the PDF is made.
+ */
+export async function printedPages(page: Page): Promise<number> {
+  await page.evaluate(() => {
+    const w = window as unknown as { print(): void; e2ePrints: number };
+    w.e2ePrints = 0;
+    w.print = () => {
+      w.e2ePrints += 1;
+    };
+  });
+  await body(page).focus();
+  if (!clocks.has(page)) {
+    await page.clock.install();
+    clocks.add(page);
+  }
+  await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000));
+  await page.keyboard.press('ControlOrMeta+P');
+  await page.clock.runFor(200);
+  expect(await page.evaluate(() => (window as unknown as { e2ePrints: number }).e2ePrints)).toBe(1);
+  await expect(page.locator('.ml-dx-print-host')).toHaveCount(1);
+  const pdf = await page.pdf({ preferCSSPageSize: true });
+  await page.clock.runFor(1000);
+  await expect(page.locator('.ml-dx-print-host')).toHaveCount(0);
+  await page.clock.resume();
+  return pdf.toString('latin1').match(/\/Type\s*\/Page\b/g)?.length ?? 0;
+}
+
+/** A picture's distances from its paragraph's left and right content edges, in pixels at 100% zoom. */
+export async function picturePlace(page: Page, picture: Locator): Promise<{ left: number; right: number }> {
+  const zoom = await editorValue(page, (e) => e.zoom);
+  return picture.evaluate((img, z) => {
+    const para = img.closest('.ml-dx-image-wrap')!.parentElement!.closest('.ml-dx-p')!;
+    const s = getComputedStyle(para);
+    const p = para.getBoundingClientRect();
+    const r = img.getBoundingClientRect();
+    return {
+      left: (r.left - p.left) / z - parseFloat(s.paddingLeft) - parseFloat(s.borderLeftWidth),
+      right: (p.right - r.right) / z - parseFloat(s.paddingRight) - parseFloat(s.borderRightWidth),
+    };
+  }, zoom);
 }
 
 /** The body editor (header and footer views also use the ml-dx-doc class). */

@@ -75,7 +75,8 @@ build served elsewhere has no relay and cannot share.
 - **Pages**: real pagination with sections, headers and footers (edited in place; their Options menu
   inserts page numbers and sets a different first page, odd and even pages, the link to the previous
   section and the distances from the page edge), columns, footnotes and endnotes (inserted and
-  edited from the menu), tables split across pages, right-to-left text and CJK.
+  edited from the menu), tables split across pages, shapes, text boxes and groups of shapes and
+  pictures (drawn, not edited), right-to-left text and CJK.
 - **PDF export** in the browser: embedded font subsets with selectable text and links; words in
   right-to-left, complex and CJK scripts are drawn as images. A 300-page document takes about
   4 seconds.
@@ -162,9 +163,9 @@ in the interface. In Vue they are `@ready`, `@update:user`, `@update:theme` and
 `@update:colorScheme`, so `v-model:user`, `v-model:theme` and `v-model:colorScheme` work.
 
 The interface keeps its classes on its own element and on a layer it adds to the page's body for
-menus, dialogs and messages (`ml-` for the interface, `ml-ui-` for menus and dialogs, `ml-dx-`
-for the document). It changes nothing on `<html>` or `<body>`, and several editors can share a
-page.
+menus, dialogs and messages (`ml-` for the interface, `ml-ui-` for menus and dialogs, `ml-dx-` for
+the document). It changes nothing on `<html>` or `<body>` (apart from a class while printing, which
+also lifts any height limit or clipping set on them), and several editors can share a page.
 
 Sharing needs the relay on the server that serves the page:
 
@@ -206,34 +207,38 @@ several.
 
 ## Tests
 
-- 115 unit tests (Vitest). In `@marginline/core`: XML, import, export and round trips of five test
+- 134 unit tests (Vitest). In `@marginline/core`: XML, import, export and round trips of six test
   documents and the six examples (each also compared through pandoc), footnotes and endnotes,
   fields, review features (comments, suggesting and viewing, regular-expression search, list styles,
   table actions, bookmarks and cross-references, footnote editing, copy formatting), paragraph
-  spacing around borders and shading, floating picture placement, the PDF writer and fonts (text
-  checked with pdftotext), the header and footer distances typed in the Options menu, and the page
-  API with several editors on a page. In `@marginline/relay`: rooms, two simulated clients editing
-  at once, late joiners and another base path. In `@marginline/react` and `@marginline/vue`, the
-  same scenarios for `mount()`: opening a document with a title and a theme and cleaning up,
+  spacing around borders and shading, floating picture placement, shapes and groups (theme colours,
+  outlines, text in a group, copy and paste, vector paths in PDF files), the PDF writer and fonts
+  (text checked with pdftotext), the header and footer distances typed in the Options menu, and the
+  page API with several editors on a page. In `@marginline/relay`: rooms, two simulated clients
+  editing at once, late joiners and another base path. In `@marginline/react` and `@marginline/vue`,
+  the same scenarios for `mount()`: opening a document with a title and a theme and cleaning up,
   Customize in the layer reporting the new name, and two editors on one page.
-- 52 end-to-end tests (Playwright), the same 26 against the React app and the Vue app: 19 desktop
+- 58 end-to-end tests (Playwright), the same 29 against the React app and the Vue app: 22 desktop
   (toolbar formatting, the overflow menu on narrow windows, comments with replies and resolve,
   suggestions accepted and rejected, Viewing with original, markup and final, filling fields,
   regular-expression replace all, the right-click menu with tables, bookmarks, cross-references and
   footnotes, DOCX and PDF export, the page API, themes and dark appearance, the 300-page example,
   page numbers in the text, a click on a square-wrapped picture over the paragraph that wraps around
-  it, header editing, the header Options menu (page X of Y, distances, a different first page,
-  linking a section to the previous one), dragging a margin on the ruler, two people editing in real
-  time) and 7 mobile (Pixel 7: tap and type in reflowed text, a tap through the message at the
-  bottom of the screen, bottom-sheet menus, comments and the review sheet, the phone menu with page
-  view and fields, the find bar, export). The suite also passes over plain HTTP LAN addresses.
+  it, shapes and a group of a picture, a text box and a line drawn on the page and in the PDF,
+  printing every page with no blank one after the last, a picture wrapped top and bottom at its
+  offset and aligned right, header editing, the header Options menu (page X of Y, distances, a
+  different first page, linking a section to the previous one), dragging a margin on the ruler, two
+  people editing in real time) and 7 mobile (Pixel 7: tap and type in reflowed text, a tap through
+  the message at the bottom of the screen, bottom-sheet menus, comments and the review sheet, the
+  phone menu with page view and fields, the find bar, export). The suite also passes over plain HTTP
+  LAN addresses.
 
 ## Layout
 
 | Path | Contents |
 | --- | --- |
 | `packages/core` | `@marginline/core`, everything the two interfaces share |
-| `packages/core/src/core` | DOCX package (`ooxml/`), XML parser and serializer (`xml/`), document model and ProseMirror schema (`model/`), import (`import/`) and export (`export/`), blank documents |
+| `packages/core/src/core` | DOCX package (`ooxml/`), XML parser and serializer (`xml/`), document model and ProseMirror schema (`model/`, with drawings), import (`import/`) and export (`export/`), blank documents |
 | `packages/core/src/editor` | The editor (`DocxEditor.ts`): commands, keymap, node views, pagination (`layout/`), headers and footers, footnotes and endnotes, fields, bookmarks and cross-references, table actions, copy formatting, clipboard, plugins for comments, tracked changes, presence, numbering, search and table styles |
 | `packages/core/src/ui` | The interface without a framework: its state and actions (`controller.ts`, `MarginlineUI`), the editor's state for the views (`store.ts`), toolbar layout, review cards, ruler geometry, menus' keyboard and placement, autosave, options and types |
 | `packages/core/src/styles` | Fonts, document styles (`editor.css`), interface styles and themes (`ui.css`) |
@@ -247,7 +252,7 @@ several.
 | `apps/web-react` | The full-page app in React |
 | `apps/web-vue` | The same app in Vue |
 | `apps/web-shared` | What both apps share: `src/shell.ts` reads the address, lists the examples, sets the window title, opens dropped files and installs the page API; `src/app.css` has the page styles; `public/` has the icons, manifest, service worker and example documents (generated by `scripts/make-fixtures.mjs`); `vite/assetLicenses.ts` completes the builds' licence files |
-| `tests/e2e` | Playwright tests, run against both apps |
+| `tests/e2e` | Playwright tests, run against both apps (one opens the `drawings.docx` test document) |
 | `scripts` | Test documents and examples (`make-fixtures.mjs`) |
 | `npm` | The npm package `marginline` (the built React app): its manifest, README and licence. Packing or publishing it there (`pnpm pack`, `npm publish`) runs `pnpm build:npm` first, and the package holds only `dist` |
 
@@ -263,7 +268,10 @@ several.
 - Block-level content controls are opened as plain content; only inline ones become fields.
 - In multi-column sections a paragraph moves to the next column as a whole; a footnote taller
   than the space left on its page is not continued on the next page.
-- Equations, charts, SmartArt and text boxes are kept unchanged but shown as placeholders.
+- Equations, charts and SmartArt are kept unchanged but shown as placeholders.
+- Shapes, text boxes, groups and drawing canvases are drawn but cannot be edited or moved. Like
+  floating pictures, they are placed from their paragraph and column, so positions measured from the
+  page or its margins come out shifted; shadows, glows and 3-D effects are not drawn.
 - Fonts that are not installed are replaced with metric-compatible open fonts, so line breaks can
   differ slightly from Word.
 - In PDF files, words in right-to-left, complex and CJK scripts are pictures, not selectable

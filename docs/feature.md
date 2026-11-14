@@ -91,6 +91,7 @@ and the tests.
 | Headers and footers | Double-click the header or footer area to edit it (not while sharing). Its bar has Options, Remove and Close; Options inserts the page number, total pages, section pages or "Page X of Y" and sets a different first page, different odd and even pages, link to previous and the header and footer distances (in inches, or centimetres where the ruler is metric) |
 | Footnotes and endnotes | Insert and edit; footnotes at the bottom of their page |
 | Tables | Merged cells, column widths, column resizing |
+| Shapes and groups | Shapes, text boxes, groups of shapes and pictures, and drawing canvases are drawn with their outlines, theme colours, gradients, dashes and arrowheads, on the page and in PDF files; they are kept unchanged and not edited |
 | Columns | Sections with several columns |
 | Right-to-left and CJK | Right-to-left paragraphs and CJK text |
 
@@ -140,7 +141,10 @@ the editor itself (`DocxEditor`, `packages/core/src/editor/DocxEditor.ts`).
 - Block-level content controls are opened as plain content; only inline ones become fields.
 - In multi-column sections a paragraph moves to the next column as a whole; a footnote taller
   than the space left on its page is not continued on the next page.
-- Equations, charts, SmartArt and text boxes are kept unchanged but shown as placeholders.
+- Equations, charts and SmartArt are kept unchanged but shown as placeholders.
+- Shapes, text boxes, groups and drawing canvases are drawn but cannot be edited or moved. Like
+  floating pictures, they are placed from their paragraph and column, so positions measured from the
+  page or its margins come out shifted; shadows, glows and 3-D effects are not drawn.
 - Fonts that are not installed are replaced with metric-compatible open fonts, so line breaks can
   differ slightly from Word.
 - In PDF files, words in right-to-left, complex and CJK scripts are pictures, not selectable text.

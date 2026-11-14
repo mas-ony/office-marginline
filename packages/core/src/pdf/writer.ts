@@ -29,9 +29,13 @@ export interface ImageRef {
   jpegComponents?: number;
 }
 
+/** A path segment: move, line, cubic Bézier curve or close. */
+export type PathSeg = ['M', number, number] | ['L', number, number] | ['C', number, number, number, number, number, number] | ['Z'];
+
 export type PdfOp =
   | { kind: 'rect'; x: number; y: number; w: number; h: number; fill: RGB }
   | { kind: 'line'; x1: number; y1: number; x2: number; y2: number; width: number; color: RGB; dash?: number[] }
+  | { kind: 'path'; segs: PathSeg[]; fill?: RGB; evenOdd?: boolean; stroke?: RGB; width?: number; dash?: number[]; cap?: 'butt' | 'round' | 'square'; join?: 'miter' | 'round' | 'bevel' }
   | { kind: 'text'; x: number; baseline: number; size: number; font: FontRef; text: string; color: RGB; width?: number }
   | { kind: 'image'; x: number; y: number; w: number; h: number; image: ImageRef }
   | { kind: 'link'; x: number; y: number; w: number; h: number; uri?: string; dest?: { page: number; y: number } };
@@ -213,6 +217,26 @@ export function writePdf(pages: PdfPage[], info: PdfInfo = {}): Uint8Array {
         case 'line':
           out.push(`${color(op.color)} RG ${num(Math.max(0.1, op.width * PT))} w ${op.dash ? `[${op.dash.map((d) => num(d * PT)).join(' ')}] 0 d` : '[] 0 d'} ${X(op.x1)} ${Y(op.y1)} m ${X(op.x2)} ${Y(op.y2)} l S`);
           break;
+        case 'path': {
+          if ((!op.fill && !op.stroke) || !op.segs.length) break;
+          const parts: string[] = ['q'];
+          if (op.fill) parts.push(`${color(op.fill)} rg`);
+          if (op.stroke) {
+            const cap = op.cap === 'round' ? 1 : op.cap === 'square' ? 2 : 0;
+            const join = op.join === 'round' ? 1 : op.join === 'bevel' ? 2 : 0;
+            parts.push(`${color(op.stroke)} RG ${num(Math.max(0.1, (op.width ?? 1) * PT))} w ${cap} J ${join} j ${op.dash?.length ? `[${op.dash.map((d) => num(d * PT)).join(' ')}] 0 d` : '[] 0 d'}`);
+          }
+          for (const sg of op.segs) {
+            if (sg[0] === 'M') parts.push(`${X(sg[1])} ${Y(sg[2])} m`);
+            else if (sg[0] === 'L') parts.push(`${X(sg[1])} ${Y(sg[2])} l`);
+            else if (sg[0] === 'C') parts.push(`${X(sg[1])} ${Y(sg[2])} ${X(sg[3])} ${Y(sg[4])} ${X(sg[5])} ${Y(sg[6])} c`);
+            else parts.push('h');
+          }
+          const star = op.evenOdd ? '*' : '';
+          parts.push(op.fill && op.stroke ? `B${star}` : op.fill ? `f${star}` : 'S', 'Q');
+          out.push(parts.join(' '));
+          break;
+        }
         case 'text': {
           if (!op.text) break;
           const f = fontFor(op.font);

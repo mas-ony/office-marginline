@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { body, caretAfter, docText, downloadOf, editHeader, editorValue, fileName, openApp, openFloatingPicture, selectWord, wordPoint } from './helpers';
+import { body, caretAfter, docText, downloadOf, editHeader, editorValue, fileName, loadFixture, openApp, openDrawings, openFixture, openFloatingPicture, pdfStreams, picturePlace, printedPages, selectWord, wordPoint } from './helpers';
 
 test.describe('desktop', () => {
   test('types and formats text from the toolbar', async ({ page }) => {
@@ -167,6 +167,55 @@ test.describe('desktop', () => {
     await expect(selected).toHaveCount(0);
     await picture.click();
     await expect(selected).toHaveCount(1);
+  });
+
+  test('draws shapes and groups of pictures, text boxes and lines', async ({ page }) => {
+    await openDrawings(page);
+    const drawings = body(page).locator('.ml-dx-drawing');
+    await expect(drawings).toHaveCount(7);
+    await expect(body(page).locator('.ml-dx-opaque')).toHaveCount(0);
+    // The group's picture and text box, drawn at twice the size of the group's child space.
+    const group = drawings.first();
+    const heading = group.getByText('Drawn heading');
+    await expect(heading).toBeVisible();
+    const g = (await group.boundingBox())!;
+    const pic = (await group.locator('.ml-dx-drawing-pic').boundingBox())!;
+    const text = (await heading.boundingBox())!;
+    expect(pic.width / g.width).toBeCloseTo(0.125, 2);
+    expect(pic.height / g.height).toBeCloseTo(1, 2);
+    expect((text.x + text.width / 2 - g.x) / g.width).toBeCloseTo(0.575, 2);
+    // The rectangle's outline: the theme's first accent, darkened by the shape's style.
+    await expect(drawings.nth(1).locator('path')).toHaveCSS('stroke', 'rgb(47, 82, 143)');
+    await group.locator('.ml-dx-drawing-pic').click();
+    await expect(group).toHaveClass(/ProseMirror-selectednode/);
+    const pdf = await page.evaluate(async () => {
+      type Api = { export(opts: { exportType: string[]; triggerDownload: boolean }): Promise<Blob> };
+      const blob = await (window as unknown as { marginline: Api }).marginline.export({ exportType: ['pdf'], triggerDownload: false });
+      return Array.from(new Uint8Array(await blob.arrayBuffer()));
+    });
+    expect(pdfStreams(Buffer.from(pdf))).toContain('0.184 0.322 0.561 RG');
+  });
+
+  test('prints every page, with no blank page after the last', async ({ page }) => {
+    // One page: printing it must not add an empty second one.
+    await openFixture(page, 'columns.docx');
+    await expect.poll(() => editorValue(page, (e) => e.pageCount)).toBe(1);
+    expect(await printedPages(page)).toBe(1);
+    await loadFixture(page, 'kitchen-sink.docx');
+    await expect.poll(() => editorValue(page, (e) => e.pageCount)).toBe(3);
+    expect(await printedPages(page)).toBe(3);
+  });
+
+  test('a picture wrapped top and bottom keeps its horizontal position', async ({ page }) => {
+    const picture = page.locator('img.ml-dx-image[alt^="Site plan"]');
+    // Half an inch (48 px) from the column's left edge.
+    await openFloatingPicture(page, 'topAndBottom', 457200);
+    await picture.scrollIntoViewIfNeeded();
+    await expect.poll(async () => (await picturePlace(page, picture)).left).toBeCloseTo(48, 0);
+    // Aligned right.
+    await openFloatingPicture(page, 'topAndBottom', 'right');
+    await picture.scrollIntoViewIfNeeded();
+    await expect.poll(async () => (await picturePlace(page, picture)).right).toBeCloseTo(0, 0);
   });
 
   test('adds a comment from the selection bubble, replies and resolves it', async ({ page }) => {

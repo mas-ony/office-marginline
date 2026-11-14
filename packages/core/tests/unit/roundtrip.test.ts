@@ -27,7 +27,7 @@ function pandocText(bytes: Uint8Array): string {
 
 const EXAMPLES = ['agreement.docx', 'template.docx', 'long-report.docx', 'tables-columns.docx', 'international.docx', 'formatting.docx'];
 
-for (const name of ['kitchen-sink.docx', 'pandoc-sample.docx', 'long.docx', 'columns.docx', 'notes.docx', ...EXAMPLES]) {
+for (const name of ['kitchen-sink.docx', 'pandoc-sample.docx', 'long.docx', 'columns.docx', 'notes.docx', 'drawings.docx', ...EXAMPLES]) {
   const source = () => (EXAMPLES.includes(name) ? example(name) : fixture(name));
   describe(`round trip: ${name}`, () => {
     const original = importDocx(source());

@@ -15,6 +15,7 @@ import {
   underlineCss,
 } from './css';
 import { defaultSection, HIGHLIGHT_COLORS } from './types';
+import { renderDrawing, type DrawingModel } from './drawing';
 
 /** JSON attribute used to carry exact attributes through the clipboard. */
 export const ATTRS_DATA = 'data-dx-attrs';
@@ -426,20 +427,31 @@ const nodes: Record<string, NodeSpec> = {
   },
 
   /** Inline content the editor cannot edit (math, charts, shapes...) preserved verbatim. */
+  /**
+   * Inline content the editor cannot edit (math, charts, shapes...) preserved verbatim. Shapes,
+   * groups and canvases it can draw carry a DrawingModel in `drawing`.
+   */
   opaque_inline: {
     group: 'inline',
     inline: true,
     atom: true,
-    attrs: { xml: { default: '' }, label: { default: 'Object' }, width: { default: null }, height: { default: null }, text: { default: '' }, src: { default: null }, part: { default: null } },
+    attrs: { xml: { default: '' }, label: { default: 'Object' }, width: { default: null }, height: { default: null }, text: { default: '' }, src: { default: null }, part: { default: null }, drawing: { default: null } },
     toDOM: (node) => {
       const a = node.attrs;
+      if (a.drawing) {
+        try {
+          return renderDrawing(a.drawing as DrawingModel, schema);
+        } catch {
+          // Drawn as the placeholder below.
+        }
+      }
       const css: string[] = [];
       if (a.width) css.push(`width: ${Math.round(emuToPx(a.width))}px`);
       if (a.height) css.push(`height: ${Math.round(emuToPx(a.height))}px`);
       if (a.src) return ['img', { class: 'ml-dx-opaque ml-dx-opaque-img', src: a.src, style: join(css), title: a.label } as Record<string, string>];
       return ['span', { class: `ml-dx-opaque${a.width ? ' ml-dx-opaque-box' : ''}`, contenteditable: 'false', title: a.label, style: join(css) }, a.text || a.label];
     },
-    parseDOM: [{ tag: '.ml-dx-opaque', getAttrs: readAttrs }],
+    parseDOM: [{ tag: '.ml-dx-opaque', getAttrs: readAttrs }, { tag: '.ml-dx-drawing', getAttrs: readAttrs }],
     leafText: (node) => node.attrs.text || '',
   },
 

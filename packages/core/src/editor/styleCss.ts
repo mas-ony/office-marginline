@@ -43,6 +43,11 @@ export function buildDocumentCss(docx: DocxDocument, scope: string): string {
     `font-size: ${(baseRun.size ?? 20) / 2}pt`,
     `--ml-dx-lhf: ${lineHeightFactor(baseFont)}`,
     `color: #000`,
+    // The same defaults again, for text boxes in drawings, which sit inside a paragraph's run
+    // and must not take its formatting.
+    `--ml-dx-doc-font: ${fontStack(baseFont)}`,
+    `--ml-dx-doc-size: ${(baseRun.size ?? 20) / 2}pt`,
+    `--ml-dx-doc-lhf: ${lineHeightFactor(baseFont)}`,
   ]);
   css += rule(`${scope} .ml-dx-p`, paraCss(defaults.pPr));
 

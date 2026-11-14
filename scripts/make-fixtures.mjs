@@ -267,6 +267,50 @@ writeFileSync(new URL('notes.docx', OUT), zip({
   'word/endnotes.xml': strToU8(notesEndnotes),
 }));
 
+// Drawings: a group of a picture, a text box and a line placed over the column, a rectangle whose
+// outline comes from its shape style and the theme (with the fallback older readers use), shapes
+// in the line (theme colour, gradient, dashed outline, arrow, custom outline) and a drawing canvas.
+{
+  const NSD = NS.replace(' mc:Ignorable', ' xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape" xmlns:wpg="http://schemas.microsoft.com/office/word/2010/wordprocessingGroup" xmlns:wpc="http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas" xmlns:v="urn:schemas-microsoft-com:vml" mc:Ignorable');
+  const WPS = 'http://schemas.microsoft.com/office/word/2010/wordprocessingShape';
+  const WPG = 'http://schemas.microsoft.com/office/word/2010/wordprocessingGroup';
+  const WPC = 'http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas';
+  // Sizes and positions below are in px (9525 EMU).
+  const emu = (n) => Math.round(n * 9525);
+  const xfrm = (x, y, w, h, attrs = '') => `<a:xfrm${attrs}><a:off x="${emu(x)}" y="${emu(y)}"/><a:ext cx="${emu(w)}" cy="${emu(h)}"/></a:xfrm>`;
+  const geom = (prst, av = '') => `<a:prstGeom prst="${prst}"><a:avLst>${av}</a:avLst></a:prstGeom>`;
+  const shape = (spPr) => `<wps:wsp><wps:cNvSpPr/><wps:spPr>${spPr}</wps:spPr><wps:bodyPr/></wps:wsp>`;
+  const connector = (spPr) => `<wps:wsp><wps:cNvCnPr/><wps:spPr>${spPr}</wps:spPr><wps:bodyPr/></wps:wsp>`;
+  let id = 0;
+  const graphic = (uri, inner) => `<wp:docPr id="${++id}" name="Drawing ${id}"/><wp:cNvGraphicFramePr/><a:graphic><a:graphicData uri="${uri}">${inner}</a:graphicData></a:graphic>`;
+  const inline = (w, h, uri, inner) => `<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${emu(w)}" cy="${emu(h)}"/><wp:effectExtent l="0" t="0" r="0" b="0"/>${graphic(uri, inner)}</wp:inline></w:drawing></w:r>`;
+  const anchor = (w, h, x, y, uri, inner) => `<wp:anchor distT="0" distB="0" distL="114300" distR="114300" simplePos="0" relativeHeight="${id + 1}" behindDoc="0" locked="0" layoutInCell="1" allowOverlap="1"><wp:simplePos x="0" y="0"/><wp:positionH relativeFrom="column"><wp:posOffset>${emu(x)}</wp:posOffset></wp:positionH><wp:positionV relativeFrom="paragraph"><wp:posOffset>${emu(y)}</wp:posOffset></wp:positionV><wp:extent cx="${emu(w)}" cy="${emu(h)}"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:wrapNone/>${graphic(uri, inner)}</wp:anchor>`;
+
+  // 400 × 100 with a child space of 200 × 50 starting at x 10: children are drawn twice as large.
+  const group = `<wpg:wgp><wpg:cNvGrpSpPr/><wpg:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${emu(400)}" cy="${emu(100)}"/><a:chOff x="${emu(10)}" y="0"/><a:chExt cx="${emu(200)}" cy="${emu(50)}"/></a:xfrm></wpg:grpSpPr>`
+    + `<pic:pic><pic:nvPicPr><pic:cNvPr id="0" name="Logo"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="rIdImg"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr>${xfrm(10, 0, 25, 50)}${geom('rect')}</pic:spPr></pic:pic>`
+    + `<wps:wsp><wps:cNvSpPr txBox="1"/><wps:spPr>${xfrm(40, 0, 170, 40)}${geom('rect')}<a:noFill/><a:ln><a:noFill/></a:ln></wps:spPr><wps:txbx><w:txbxContent>${p(run('Drawn heading', '<w:b/>'), '<w:spacing w:after="0"/><w:jc w:val="center"/>')}${p(run('Second line'), '<w:spacing w:after="0"/><w:jc w:val="center"/>')}</w:txbxContent></wps:txbx><wps:bodyPr rot="0" vert="horz" wrap="square" lIns="91440" tIns="45720" rIns="91440" bIns="45720" anchor="t"/></wps:wsp>`
+    + connector(`${xfrm(10, 47, 200, 1, ' flipV="1"')}${geom('line')}<a:ln w="28575"><a:solidFill><a:srgbClr val="000000"/></a:solidFill></a:ln>`)
+    + '</wpg:wgp>';
+  const styled = `<wps:wsp><wps:cNvSpPr/><wps:spPr>${xfrm(0, 0, 23, 15)}${geom('rect')}<a:noFill/></wps:spPr><wps:style><a:lnRef idx="2"><a:schemeClr val="accent1"><a:shade val="50000"/></a:schemeClr></a:lnRef><a:fillRef idx="1"><a:schemeClr val="accent1"/></a:fillRef><a:effectRef idx="0"><a:schemeClr val="accent1"/></a:effectRef><a:fontRef idx="minor"><a:schemeClr val="lt1"/></a:fontRef></wps:style><wps:bodyPr rot="0" vert="horz" wrap="square" lIns="91440" tIns="45720" rIns="91440" bIns="45720" anchor="ctr"/></wps:wsp>`;
+  const checkBox = `<w:r><mc:AlternateContent><mc:Choice Requires="wps"><w:drawing>${anchor(23, 15, 4, 2, WPS, styled)}</w:drawing></mc:Choice><mc:Fallback><w:pict><v:rect style="position:absolute;margin-left:3pt;margin-top:1.5pt;width:17.25pt;height:11.25pt" filled="f" strokecolor="#2f528f" strokeweight="1pt"/></w:pict></mc:Fallback></mc:AlternateContent></w:r>`;
+  const shapes = [
+    inline(40, 30, WPS, shape(`${xfrm(0, 0, 40, 30)}${geom('ellipse')}<a:solidFill><a:schemeClr val="accent2"><a:lumMod val="75000"/></a:schemeClr></a:solidFill><a:ln><a:noFill/></a:ln>`)),
+    inline(60, 30, WPS, shape(`${xfrm(0, 0, 60, 30)}${geom('roundRect', '<a:gd name="adj" fmla="val 25000"/>')}<a:gradFill><a:gsLst><a:gs pos="0"><a:schemeClr val="accent1"/></a:gs><a:gs pos="100000"><a:srgbClr val="FFFFFF"/></a:gs></a:gsLst><a:lin ang="5400000" scaled="0"/></a:gradFill><a:ln w="9525"><a:solidFill><a:srgbClr val="1F3864"/></a:solidFill><a:prstDash val="dash"/></a:ln>`)),
+    inline(60, 20, WPS, connector(`${xfrm(0, 0, 60, 20)}${geom('straightConnector1')}<a:ln w="19050"><a:solidFill><a:srgbClr val="C00000"/></a:solidFill><a:tailEnd type="triangle"/></a:ln>`)),
+    inline(40, 40, WPS, shape(`${xfrm(0, 0, 40, 40)}<a:custGeom><a:avLst/><a:gdLst/><a:ahLst/><a:cxnLst/><a:rect l="0" t="0" r="r" b="b"/><a:pathLst><a:path w="100" h="100"><a:moveTo><a:pt x="0" y="100"/></a:moveTo><a:lnTo><a:pt x="0" y="50"/></a:lnTo><a:arcTo wR="50" hR="50" stAng="10800000" swAng="10800000"/><a:lnTo><a:pt x="100" y="100"/></a:lnTo><a:close/></a:path></a:pathLst></a:custGeom><a:solidFill><a:srgbClr val="FFC000"><a:alpha val="50000"/></a:srgbClr></a:solidFill>`)),
+  ];
+  const canvas = `<wpc:wpc><wpc:bg><a:solidFill><a:srgbClr val="F2F2F2"/></a:solidFill></wpc:bg><wpc:whole><a:ln><a:noFill/></a:ln></wpc:whole>${shape(`${xfrm(10, 10, 30, 20)}${geom('diamond')}<a:solidFill><a:srgbClr val="70AD47"/></a:solidFill>`)}</wpc:wpc>`;
+  const drawingsBody = [
+    p(`<w:r><w:drawing>${anchor(400, 100, 0, 0, WPG, group)}</w:drawing></w:r>${run('Letterhead')}`, '<w:spacing w:after="1600"/>'),
+    p(`${checkBox}${run('Check box')}`, '<w:ind w:left="567"/>'),
+    p(shapes.join(run(' '))),
+    p(inline(60, 40, WPC, canvas)),
+    `<w:sectPr>${pgSz}</w:sectPr>`,
+  ].join('');
+  writeFileSync(new URL('drawings.docx', OUT), zip({ ...files, 'word/document.xml': strToU8(`${DECL}<w:document ${NSD}><w:body>${drawingsBody}</w:body></w:document>`) }));
+}
+
 console.log('fixtures written to', OUT.pathname);
 
 // ================================================================================================

@@ -2,12 +2,13 @@ import { Mark, type Node as PMNode } from 'prosemirror-model';
 import { DocxDocument, type HeaderFooterPart, type UrlFactory } from '../document';
 import { IMAGE_CONTENT_TYPES, OoxmlPackage, REL, relTypeIs, type Relationship } from '../ooxml/package';
 import { parseIntSafe, parseMeasure, parseOnOff, parsePct } from '../ooxml/units';
+import { drawingTheme, isDrawingUri, readDrawing, type DrawingModel, type DrawingSource, type DrawingTheme } from '../model/drawing';
 import { runPropsToMarks } from '../model/marks';
 import { bulletChar, NumberingModel } from '../model/numbering';
 import { parseBorders, parseParaProps, parseRunProps, parseSection, parseShading } from '../model/props';
 import { schema } from '../model/schema';
 import { parseCellMargins, parseTheme, StyleSheet } from '../model/styles';
-import type { CommentReply, CommentThread, MediaItem, SectionProps, TrackInfo } from '../model/types';
+import type { AnchorInfo, CommentReply, CommentThread, MediaItem, SectionProps, TrackInfo } from '../model/types';
 import { attr, child, childrenNamed, elements, findAll, findFirst, parseXml, serializeNode, textContent, type XmlElement } from '../xml/xml';
 
 export interface ImportOptions {
@@ -15,20 +16,7 @@ export interface ImportOptions {
   urlFactory?: UrlFactory;
 }
 
-export interface AnchorInfo {
-  wrap: 'square' | 'tight' | 'through' | 'topAndBottom' | 'none';
-  behindDoc: boolean;
-  hRelative?: string;
-  hAlign?: string;
-  hOffset?: number;
-  vRelative?: string;
-  vAlign?: string;
-  vOffset?: number;
-  distT: number;
-  distB: number;
-  distL: number;
-  distR: number;
-}
+export type { AnchorInfo } from '../model/types';
 
 interface FieldFrame {
   instr: string;
@@ -77,6 +65,8 @@ function nonEmpty<T extends object>(o: T): T | null {
 class ImportContext {
   media = new Map<string, MediaItem>();
   warnings: string[] = [];
+  /** Theme colours and line widths that drawings refer to. */
+  theme: DrawingTheme = drawingTheme({});
 
   constructor(readonly pkg: OoxmlPackage, readonly urlFactory?: UrlFactory) {}
 
@@ -690,7 +680,10 @@ class PartImporter {
     const cx = parseIntSafe(attr(extent, 'cx')) ?? 914400;
     const cy = parseIntSafe(attr(extent, 'cy')) ?? 914400;
     const docPr = child(container, 'wp:docPr');
-    const pic = container ? findFirst(container, 'pic:pic') : undefined;
+    const graphicData = container ? findFirst(container, 'a:graphicData') : undefined;
+    const uri = attr(graphicData, 'uri') ?? '';
+    // Only a picture graphic is a picture: pictures in groups and canvases are parts of those.
+    const pic = child(graphicData, 'pic:pic');
     const isAnchor = container?.name === 'wp:anchor';
     if (pic) {
       const blip = findFirst(pic, 'a:blip');
@@ -710,10 +703,28 @@ class PartImporter {
         }, null, marks);
       }
     }
-    const uri = container ? attr(findFirst(container, 'a:graphicData'), 'uri') ?? '' : '';
     const label = uri.includes('chart') ? 'Chart' : uri.includes('diagram') ? 'SmartArt' : uri.includes('wordprocessingGroup') ? 'Group' : uri.includes('Canvas') ? 'Drawing canvas' : 'Shape';
     const text = container ? findAll(container, 'w:t').map(textContent).join(' ').slice(0, 200) : '';
-    return schema.nodes.opaque_inline.create({ xml: serializeNode(rawEl), label, width: cx, height: cy, text, src: fallbackSrc ?? null, part: this.part }, null, marks);
+    let model: DrawingModel | null = null;
+    if (container && isDrawingUri(uri)) {
+      try {
+        model = readDrawing(container, this.drawingSource(), isAnchor ? this.anchorInfo(container) : null);
+        // Nothing it can draw (charts in a group, say): show the placeholder instead.
+        if (model && !model.parts.length) model = null;
+      } catch (e) {
+        this.ctx.warnings.push(`Could not read a drawing: ${(e as Error).message}`);
+      }
+    }
+    return schema.nodes.opaque_inline.create({ xml: serializeNode(rawEl), label, width: cx, height: cy, text, src: fallbackSrc ?? null, part: this.part, drawing: model }, null, marks);
+  }
+
+  private drawingSource(): DrawingSource {
+    return {
+      theme: this.ctx.theme,
+      media: (rId) => this.ctx.media4(this.part, rId),
+      // Its own importer: fields, comments and bookmarks in a text box are not the paragraph's.
+      text: (content) => new PartImporter(this.ctx, this.part).blocks(content).map((n) => n.toJSON()),
+    };
   }
 
   private alternateContent(ac: XmlElement, marks: readonly Mark[]): PMNode {
@@ -853,18 +864,21 @@ export function importDocx(bytes: Uint8Array, opts: ImportOptions = {}): DocxDoc
   if (!xml) throw new Error('Not a valid DOCX file: the main document part is empty');
   const { root, extraNamespaces } = parseXml(xml);
   if (root.name !== 'w:document') throw new Error(`Unsupported main document (${root.name}); only WordprocessingML documents can be opened`);
-  const ctx = new ImportContext(pkg, opts.urlFactory);
-  const imp = new PartImporter(ctx, mainPath);
-  const bodyEl = child(root, 'w:body');
-  const blocks = imp.blocks(bodyEl);
-  if (!blocks.length || blocks[blocks.length - 1].type !== schema.nodes.paragraph) blocks.push(schema.nodes.paragraph.create());
-
-  // Settings
+  // Settings (read first: drawings need the colour mapping)
   const settingsRel = pkg.findRel(mainPath, REL.settings);
   const settingsPath = settingsRel ? pkg.resolveTarget(mainPath, settingsRel.target) : null;
   const settingsXml = settingsPath ? pkg.getText(settingsPath) : undefined;
   const settingsDoc = settingsXml ? parseXml(settingsXml) : null;
   const sroot = settingsDoc?.root;
+  const theme = parseTheme(relText(REL.theme));
+
+  const ctx = new ImportContext(pkg, opts.urlFactory);
+  ctx.theme = drawingTheme(theme.colors, theme.lineWidths, child(sroot, 'w:clrSchemeMapping'));
+  const imp = new PartImporter(ctx, mainPath);
+  const bodyEl = child(root, 'w:body');
+  const blocks = imp.blocks(bodyEl);
+  if (!blocks.length || blocks[blocks.length - 1].type !== schema.nodes.paragraph) blocks.push(schema.nodes.paragraph.create());
+
   const evenAndOdd = !!child(sroot, 'w:evenAndOddHeaders') && parseOnOff(attr(child(sroot, 'w:evenAndOddHeaders'), 'w:val'));
   const defaultTabStop = parseMeasure(attr(child(sroot, 'w:defaultTabStop'), 'w:val'), 'twips') ?? 720;
   const trackRevisions = !!child(sroot, 'w:trackRevisions') && parseOnOff(attr(child(sroot, 'w:trackRevisions'), 'w:val'));
@@ -874,7 +888,7 @@ export function importDocx(bytes: Uint8Array, opts: ImportOptions = {}): DocxDoc
 
   const doc = new DocxDocument(pkg, mainPath, body, styles, numbering, opts.fileName ?? 'Document.docx');
   doc.setUrlFactory(opts.urlFactory);
-  doc.theme = parseTheme(relText(REL.theme));
+  doc.theme = theme;
   doc.documentRootAttrs = { ...root.attrs };
   doc.documentExtraXml = elements(root).filter((e) => e.name !== 'w:body').map(serializeNode);
   doc.documentNamespaces = extraNamespaces;
